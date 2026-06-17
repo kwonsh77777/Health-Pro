@@ -1,37 +1,469 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" type="image/png" href="icon.png">
-    
-    <link rel="manifest" href="manifest.json">
-    
-    <title>Health Pro - AI 피트니스 매니저</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #ffffff;
-        }
-        /* 구글 보안 배너(상단 30px)를 화면 바깥 상단 영역으로 밀어 올려 강제로 숨기는 오프셋 기법 */
-        iframe {
-            width: 100%;
-            height: calc(100% + 30px);
-            border: none;
-            margin-top: -30px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Health Track Pro</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Health Pro">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#ffffff">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* 캘린더 그리드 스타일 */
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .calendar-day { padding: 10px; text-align: center; border-radius: 8px; cursor: pointer; transition: all 0.2s; border: 1px solid #e5e7eb;}
+    .calendar-day:hover { background-color: #f3f4f6; }
+    .calendar-day.active { background-color: #3b82f6; color: white; border-color: #3b82f6; font-weight: bold;}
+    .calendar-day.has-data { border-bottom: 4px solid #10b981; }
+    .calendar-header { text-align: center; font-weight: bold; padding: 5px 0; color: #6b7280; font-size: 0.875rem;}
+
+    /* 모바일 팝업(모달) 스타일 */
+    @media (max-width: 1023px) {
+      .mobile-modal.active {
+        display: flex !important;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .mobile-modal-content {
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+    }
+  </style>
 </head>
-<body>
-    <iframe src="https://script.google.com/macros/s/여기에_웹앱_배포_ID를_입력하세요/exec"></iframe>
+<body class="bg-gray-50 min-h-screen pb-10">
+
+  <nav class="bg-white shadow-md p-4 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+        <h1 class="text-2xl font-extrabold text-blue-600 flex items-center">
+          💪 Health Pro <span class="text-xs font-medium text-gray-400 ml-2">by Gemini 2.5</span>
+        </h1>
+        <div class="flex items-center space-x-2 bg-gray-50 border border-gray-200 px-3 py-1 rounded-md text-xs sm:text-sm w-full md:w-auto justify-center">
+          <span class="text-gray-600 font-semibold whitespace-nowrap">조회기간</span>
+          <input type="date" id="fromDate" class="bg-transparent border-none outline-none text-gray-700 cursor-pointer w-auto">
+          <span class="text-gray-400">~</span>
+          <input type="date" id="toDate" class="bg-transparent border-none outline-none text-gray-700 cursor-pointer w-auto">
+          <button onclick="setWeekRange()" class="ml-1 bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-bold hover:bg-gray-300 transition whitespace-nowrap">주</button>
+        </div>
+      </div>
+      <div class="flex space-x-2 w-full md:w-auto">
+        <input type="text" id="userName" placeholder="이름을 입력하세요" class="border rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 flex-grow md:w-48">
+        <button onclick="loadUserData()" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-bold hover:bg-blue-700 transition whitespace-nowrap">조회</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto p-4 mt-2 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <div class="lg:col-span-4 space-y-6">
+      
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <div class="flex justify-between items-center mb-4">
+          <button onclick="changeMonth(-1)" class="p-2 hover:bg-gray-100 rounded text-gray-600 font-bold">&lt;</button>
+          <h2 id="calendarMonthTitle" class="text-lg font-bold text-gray-800">2026년 6월</h2>
+          <button onclick="changeMonth(1)" class="p-2 hover:bg-gray-100 rounded text-gray-600 font-bold">&gt;</button>
+        </div>
+        
+        <div class="calendar-grid mb-2">
+          <div class="calendar-header text-red-500">일</div>
+          <div class="calendar-header">월</div>
+          <div class="calendar-header">화</div>
+          <div class="calendar-header">수</div>
+          <div class="calendar-header">목</div>
+          <div class="calendar-header">금</div>
+          <div class="calendar-header text-blue-500">토</div>
+        </div>
+        <div id="calendarDays" class="calendar-grid text-sm"></div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 lg:hidden">
+        <button onclick="openModal('aiModal')" class="bg-indigo-50 border border-indigo-200 text-indigo-800 font-bold py-3 px-4 rounded-xl flex items-center justify-between shadow-sm active:bg-indigo-100">
+          <span class="flex items-center"><span class="mr-2 text-lg">✨</span> Gemini 2.5 AI 분석 보기</span> <span class="text-indigo-400">➔</span>
+        </button>
+        <button onclick="openModal('bodyChartModal')" class="bg-blue-50 border border-blue-200 text-blue-800 font-bold py-3 px-4 rounded-xl flex items-center justify-between shadow-sm active:bg-blue-100">
+          <span class="flex items-center"><span class="mr-2 text-lg">📈</span> 체성분 변화 추이 보기</span> <span class="text-blue-400">➔</span>
+        </button>
+        <button onclick="openModal('workoutChartModal')" class="bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-3 px-4 rounded-xl flex items-center justify-between shadow-sm active:bg-emerald-100">
+          <span class="flex items-center"><span class="mr-2 text-lg">📊</span> 운동량 변화 추이 보기</span> <span class="text-emerald-400">➔</span>
+        </button>
+      </div>
+
+      <div id="formModal" class="mobile-modal hidden lg:block">
+        <div class="mobile-modal-content bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="font-bold text-gray-800 mb-4 border-b pb-2 flex flex-col sm:flex-row sm:items-end justify-between">
+            <span>기록 입력 (<span id="selectedDateText" class="text-blue-600"></span>)</span>
+            <span id="defaultNotice" class="text-xs text-orange-500 font-normal mt-1 sm:mt-0"></span>
+          </h3>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">체중 (kg)</label><input type="number" step="0.1" id="input_weight" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">골격근량 (kg)</label><input type="number" step="0.1" id="input_muscle" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">체지방률 (%)</label><input type="number" step="0.1" id="input_fat" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">스쿼트 (회)</label><input type="number" id="input_squat" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">AB슬라이드 (회)</label><input type="number" id="input_ab" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div><label class="block text-xs font-semibold text-gray-600 mb-1">팔굽혀펴기 (회)</label><input type="number" id="input_pushup" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200"></div>
+            <div class="col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">Steps (회)</label><input type="number" id="input_steps" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-200" placeholder="오늘 걸은 걸음수를 입력하세요"></div>
+          </div>
+          
+          <button onclick="saveRecord()" class="mt-5 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg transition shadow-sm">
+            기록 저장하기
+          </button>
+          <p id="saveStatus" class="text-xs text-center mt-2 text-gray-500 h-4"></p>
+
+          <button onclick="history.back()" class="mt-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg transition lg:hidden">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-8 space-y-6">
+      
+      <div id="aiModal" class="mobile-modal hidden lg:block">
+        <div class="mobile-modal-content bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl shadow-sm border border-blue-100 relative">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+            <h3 class="font-bold text-indigo-800 flex items-center"><span class="text-xl mr-2">✨</span> Gemini 2.5 AI 트레이너</h3>
+            <button onclick="requestAIFeedback()" class="text-xs bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+              최신 분석 받기
+            </button>
+          </div>
+          <div class="bg-white p-4 rounded-lg bg-opacity-60 border border-indigo-100 min-h-[100px]">
+            <p id="aiFeedbackBox" class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+              조회 후 [최신 분석 받기] 버튼을 눌러주세요.
+            </p>
+          </div>
+          <button onclick="history.back()" class="mt-4 w-full bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg lg:hidden">닫기</button>
+        </div>
+      </div>
+
+      <div id="bodyChartModal" class="mobile-modal hidden lg:block">
+        <div class="mobile-modal-content bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">체성분 변화 추이</h3>
+          <div class="h-64 sm:h-72"><canvas id="bodyChart"></canvas></div>
+          <button onclick="history.back()" class="mt-4 w-full bg-gray-100 text-gray-700 font-bold py-2 px-4 rounded-lg lg:hidden">닫기</button>
+        </div>
+      </div>
+
+      <div id="workoutChartModal" class="mobile-modal hidden lg:block">
+        <div class="mobile-modal-content bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+          <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">운동량 변화 추이</h3>
+          <div class="h-64 sm:h-72"><canvas id="workoutChart"></canvas></div>
+          <button onclick="history.back()" class="mt-4 w-full bg-gray-100 text-gray-700 font-bold py-2 px-4 rounded-lg lg:hidden">닫기</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // =======================================================
+    // 🚨 중요: 여기에 배포하신 새로운 Apps Script 웹 앱 URL을 입력하세요!
+    // =======================================================
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzCdr9OkHloUTOBAyhWw_XWmyC23yOjIH75WeoIHbJq3wppP3F-3h98tLUbLTYE7fEUdA/exec';
+    
+    // --- 통신(API) 공통 로직 ---
+    async function callApi(action, data) {
+      const payload = { action: action, ...data };
+      try {
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error("API Call Error:", error);
+        return { success: false, message: error.toString() };
+      }
+    }
+    // =======================================================
+
+    let currentDate = new Date();
+    let selectedDateStr = "";
+    let globalUserData = [];
+    let bodyChartInstance = null;
+    let workoutChartInstance = null;
+    let activeModals = [];
+
+    window.onload = () => {
+      const savedName = localStorage.getItem('healthProUserName');
+      if (savedName) document.getElementById('userName').value = savedName;
+      
+      const today = new Date();
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(today.getMonth() - 1);
+      
+      document.getElementById('toDate').value = formatDate(today);
+      document.getElementById('fromDate').value = formatDate(oneMonthAgo);
+
+      selectDate(formatDate(new Date()), false);
+      renderCalendar();
+    };
+
+    function formatDate(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function setWeekRange() {
+      const today = new Date();
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(today.getDate() - 7);
+      
+      document.getElementById('toDate').value = formatDate(today);
+      document.getElementById('fromDate').value = formatDate(oneWeekAgo);
+    }
+
+    function changeMonth(offset) {
+      currentDate.setMonth(currentDate.getMonth() + offset);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      document.getElementById('calendarMonthTitle').innerText = `${year}년 ${month + 1}월`;
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const daysContainer = document.getElementById('calendarDays');
+      daysContainer.innerHTML = '';
+
+      for (let i = 0; i < firstDayIndex; i++) {
+        daysContainer.appendChild(document.createElement('div'));
+      }
+
+      for (let i = 1; i <= lastDay; i++) {
+        const dayDiv = document.createElement('div');
+        const loopDateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        
+        dayDiv.innerText = i;
+        dayDiv.className = 'calendar-day';
+        if (loopDateStr === selectedDateStr) dayDiv.classList.add('active');
+        
+        if (globalUserData.find(d => d.date === loopDateStr)) dayDiv.classList.add('has-data');
+
+        dayDiv.onclick = () => selectDate(loopDateStr, true);
+        daysContainer.appendChild(dayDiv);
+      }
+    }
+
+    function selectDate(dateStr, isUserClick = false) {
+      selectedDateStr = dateStr;
+      document.getElementById('selectedDateText').innerText = dateStr;
+      const noticeEl = document.getElementById('defaultNotice');
+      noticeEl.innerText = ""; 
+      
+      const existingData = globalUserData.find(d => d.date === dateStr);
+      
+      if (existingData) {
+        document.getElementById('input_weight').value = existingData.weight;
+        document.getElementById('input_muscle').value = existingData.muscle;
+        document.getElementById('input_fat').value = existingData.fat;
+        document.getElementById('input_squat').value = existingData.squat;
+        document.getElementById('input_ab').value = existingData.ab;
+        document.getElementById('input_pushup').value = existingData.pushup;
+        document.getElementById('input_steps').value = existingData.steps; 
+      } else {
+        let recentData = null;
+        for (let i = globalUserData.length - 1; i >= 0; i--) {
+          if (globalUserData[i].date < dateStr) {
+            recentData = globalUserData[i];
+            break;
+          }
+        }
+
+        if (recentData) {
+          document.getElementById('input_weight').value = recentData.weight;
+          document.getElementById('input_muscle').value = recentData.muscle;
+          document.getElementById('input_fat').value = recentData.fat;
+          document.getElementById('input_squat').value = recentData.squat;
+          document.getElementById('input_ab').value = recentData.ab;
+          document.getElementById('input_pushup').value = recentData.pushup;
+          document.getElementById('input_steps').value = recentData.steps; 
+          noticeEl.innerText = `※ 최근 기록(${recentData.date}) 세팅됨`;
+        } else {
+          document.getElementById('input_weight').value = '';
+          document.getElementById('input_muscle').value = '';
+          document.getElementById('input_fat').value = '';
+          document.getElementById('input_squat').value = '';
+          document.getElementById('input_ab').value = '';
+          document.getElementById('input_pushup').value = '';
+          document.getElementById('input_steps').value = '';
+        }
+      }
+      
+      renderCalendar(); 
+
+      if (isUserClick && window.innerWidth < 1024) openModal('formModal');
+    }
+
+    function openModal(modalId) {
+      if (window.innerWidth >= 1024) return;
+      const modal = document.getElementById(modalId);
+      modal.classList.add('active');
+      activeModals.push(modalId);
+      history.pushState({ modalId: modalId }, '', '');
+    }
+
+    window.addEventListener('popstate', (event) => {
+      if (activeModals.length > 0) {
+        const topModalId = activeModals.pop();
+        const modal = document.getElementById(topModalId);
+        if (modal) modal.classList.remove('active');
+      }
+    });
+
+    function saveRecord() {
+      const nameInput = document.getElementById('userName');
+      const name = nameInput.value.trim();
+      if (!name) { alert("이름을 입력해주세요!"); return; }
+      if (!selectedDateStr) { alert("달력에서 날짜를 선택해주세요!"); return; }
+
+      const weight = document.getElementById('input_weight').value || 0;
+      const muscle = document.getElementById('input_muscle').value || 0;
+      const fat = document.getElementById('input_fat').value || 0;
+      const squat = document.getElementById('input_squat').value || 0;
+      const ab = document.getElementById('input_ab').value || 0;
+      const pushup = document.getElementById('input_pushup').value || 0;
+      const steps = document.getElementById('input_steps').value || 0;
+
+      const statusEl = document.getElementById('saveStatus');
+      statusEl.innerText = "저장 중입니다...";
+      statusEl.className = "text-xs text-center mt-2 text-blue-500 font-bold h-4";
+
+      const currentUserName = name;
+      localStorage.setItem('healthProUserName', currentUserName);
+
+      // fetch 통신
+      callApi('saveData', {
+        date: selectedDateStr, name: currentUserName, weight: weight, muscle: muscle, fat: fat, squat: squat, ab: ab, pushup: pushup, steps: steps
+      }).then(res => {
+        if (res.success) {
+          statusEl.innerText = "저장 완료!";
+          statusEl.className = "text-xs text-center mt-2 text-green-500 font-bold h-4";
+          nameInput.value = currentUserName;
+          
+          if (window.innerWidth < 1024 && activeModals.includes('formModal')) {
+            history.back();
+          }
+          loadUserData(); 
+        } else {
+          statusEl.innerText = "저장 실패: " + res.message;
+          statusEl.className = "text-xs text-center mt-2 text-red-500 font-bold h-4";
+        }
+        setTimeout(() => statusEl.innerText = "", 3000);
+      });
+    }
+
+    function loadUserData() {
+      const nameInput = document.getElementById('userName');
+      const name = nameInput.value.trim();
+      if (!name) { alert("조회할 이름을 입력해주세요!"); return; }
+
+      const fromDateStr = document.getElementById('fromDate').value;
+      const toDateStr = document.getElementById('toDate').value;
+      if(fromDateStr > toDateStr) {
+        alert("시작 날짜가 종료 날짜보다 클 수 없습니다.");
+        return;
+      }
+
+      localStorage.setItem('healthProUserName', name);
+
+      // fetch 통신
+      callApi('getUserData', { name: name }).then(res => {
+        if (res.success) {
+          globalUserData = res.data.filter(d => {
+            return d.date >= fromDateStr && d.date <= toDateStr;
+          });
+          nameInput.value = name; 
+          renderCalendar(); 
+          updateCharts();   
+          selectDate(selectedDateStr, false); 
+        } else {
+          alert("조회 실패: " + res.message);
+        }
+      });
+    }
+
+    function requestAIFeedback() {
+      if (globalUserData.length === 0) {
+        alert("분석할 데이터가 없습니다. 먼저 기록을 저장하거나 조회해주세요.");
+        return;
+      }
+      
+      const recentData = globalUserData.slice(-7);
+      let dataStr = "";
+      recentData.forEach(d => {
+        dataStr += `[${d.date}] 체중:${d.weight}kg, 근육량:${d.muscle}kg, 체지방:${d.fat}%, 스쿼트:${d.squat}회, AB:${d.ab}회, 푸쉬업:${d.pushup}회, Steps:${d.steps}회\n`;
+      });
+
+      const aiBox = document.getElementById('aiFeedbackBox');
+      aiBox.innerText = "Gemini 2.5 AI 트레이너가 데이터를 열심히 분석하고 있습니다... ⏳";
+
+      // fetch 통신
+      callApi('analyzeDataWithGemini', { dataStr: dataStr }).then(res => {
+        if (res.success) {
+          aiBox.innerText = res.feedback;
+        } else {
+          aiBox.innerText = "분석 실패: " + res.message;
+        }
+      });
+    }
+
+    function updateCharts() {
+      const labels = globalUserData.map(d => d.date);
+      const weights = globalUserData.map(d => d.weight);
+      const muscles = globalUserData.map(d => d.muscle);
+      const fats = globalUserData.map(d => d.fat);
+      const squats = globalUserData.map(d => d.squat);
+      const abs = globalUserData.map(d => d.ab);
+      const pushups = globalUserData.map(d => d.pushup);
+      const stepsList = globalUserData.map(d => d.steps); 
+
+      const bodyCtx = document.getElementById('bodyChart').getContext('2d');
+      if (bodyChartInstance) bodyChartInstance.destroy();
+      bodyChartInstance = new Chart(bodyCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: '체중(kg)', data: weights, borderColor: '#ef4444', backgroundColor: '#ef4444', tension: 0.3 },
+            { label: '골격근량(kg)', data: muscles, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.3 },
+            { label: '체지방률(%)', data: fats, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const workoutCtx = document.getElementById('workoutChart').getContext('2d');
+      if (workoutChartInstance) workoutChartInstance.destroy();
+      workoutChartInstance = new Chart(workoutCtx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: '스쿼트', data: squats, backgroundColor: '#8b5cf6' },
+            { label: 'AB슬라이드', data: abs, backgroundColor: '#10b981' },
+            { label: '팔굽혀펴기', data: pushups, backgroundColor: '#f43f5e' },
+            { label: 'Steps(걸음수)', data: stepsList, backgroundColor: '#3b82f6' }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  </script>
 </body>
 </html>

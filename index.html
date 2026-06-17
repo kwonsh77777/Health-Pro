@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Health Track Pro</title>
   
+  <link rel="manifest" href="manifest.json">
+
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Health Pro">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#ffffff">
-
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="apple-touch-icon" href="icon.png"> <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#3b82f6"> <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* 캘린더 그리드 스타일 */
@@ -347,7 +347,6 @@
       const currentUserName = name;
       localStorage.setItem('healthProUserName', currentUserName);
 
-      // fetch 통신
       callApi('saveData', {
         date: selectedDateStr, name: currentUserName, weight: weight, muscle: muscle, fat: fat, squat: squat, ab: ab, pushup: pushup, steps: steps
       }).then(res => {
@@ -382,7 +381,6 @@
 
       localStorage.setItem('healthProUserName', name);
 
-      // fetch 통신
       callApi('getUserData', { name: name }).then(res => {
         if (res.success) {
           globalUserData = res.data.filter(d => {
@@ -413,7 +411,6 @@
       const aiBox = document.getElementById('aiFeedbackBox');
       aiBox.innerText = "Gemini 2.5 AI 트레이너가 데이터를 열심히 분석하고 있습니다... ⏳";
 
-      // fetch 통신
       callApi('analyzeDataWithGemini', { dataStr: dataStr }).then(res => {
         if (res.success) {
           aiBox.innerText = res.feedback;
